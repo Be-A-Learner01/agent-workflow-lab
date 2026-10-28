@@ -1,0 +1,61 @@
+const [log, setLog] = useState([]);
+  const [running, setRunning] = useState(false);
+  const wsRef = useRef(null);
+
+
+
+  const start = () => {
+    setLog([]);
+    setRunning(true);
+    setLog((p) => [...p, '⏳ 正在连接服务器...']);
+
+    // 注意：Vite 默认前端在 5173 端口，后端在 8000 端口
+    const ws = new WebSocket('ws://localhost:8000/ws/run');
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      setLog((p) => [...p, '✅ 连接成功，正在发送任务...']);
+      ws.send(JSON.stringify({ topic: 'AI Agent 趋势' }));
+    };
+
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'node_done') {
+        updateNodeStatus(msg.nodes, 'done');
+        setLog((p) => [...p, `▶ 节点 [${msg.node}] 执行完成`]);
+      }
+      if (msg.type === 'done') {
+        setLog((p) => [...p, '🎉 全部完成']);
+        setRunning(false);
+        ws.close();
+      }
+    };
+
+    ws.onerror = () => {
+      setLog((p) => [...p, '❌ 连接发生错误']);
+      setRunning(false);
+    };
+
+    ws.onclose = () => {
+      setRunning(false);
+    };
+  };
+
+const updateNodeStatus = (nodeId, newStatus) => {
+  setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id === nodeId) return {...n, data: {...n.data, status: newStatus}};
+        return n;
+      })
+  );
+};
+function StatusNode({data}) {
+  const borderColor = data.status === 'done' ? '#10b981': data.status === 'running' ? '#3b82f6': '#d1d5db';
+  return (
+      <div style={{padding: '10px, 20px', borderRadius: 8, border: `2px solid ${borderColor}`, background: '#fff'}}>
+        <Handle type={"target"} position={Position.Top} />
+        <div style={{fontWeight: 'bold'}}>{data.label}</div>
+        <Handle type={"source"} position={Position.Bottom}/>
+      </div>
+  );
+}
